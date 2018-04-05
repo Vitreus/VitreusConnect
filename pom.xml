@@ -4,7 +4,7 @@
 
 	<groupId>online.vitreusmc.vitreusConnect</groupId>
 	<artifactId>VitreusConnect</artifactId>
-	<version>0.2.0</version>
+	<version>0.4.0-SNAPSHOT</version>
 	
 	<packaging>jar</packaging>
 	
@@ -49,14 +49,6 @@
 	
 	<build>
 		<defaultGoal>package</defaultGoal>
-		<resources>
-			<resource>
-				<directory>src</directory>
-			</resource>
-			<resource>
-				<directory>resources</directory>
-			</resource>
-		</resources>
     	<plugins>
     		<plugin>
 			    <groupId>org.apache.maven.plugins</groupId>

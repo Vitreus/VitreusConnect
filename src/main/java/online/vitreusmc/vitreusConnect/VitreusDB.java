@@ -1,110 +1,93 @@
 package online.vitreusmc.vitreusConnect;
 
-import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-import org.bukkit.Statistic;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.Player;
 import org.mongodb.morphia.Datastore;
 import org.mongodb.morphia.Morphia;
+import org.mongodb.morphia.dao.BasicDAO;
+import org.mongodb.morphia.mapping.MapperOptions;
 
 import com.mongodb.MongoClient;
 import com.mongodb.MongoCredential;
 import com.mongodb.ServerAddress;
 
-import net.md_5.bungee.api.ChatColor;
-import online.vitreusmc.vitreusConnect.dao.VitreusPlayerDAO;
-import online.vitreusmc.vitreusConnect.object.VitreusPlayer;
+import online.vitreusmc.vitreusConnect.object.VitreusObject;
 
 public class VitreusDB {
 
-	private ServerAddress address;
-	private List<MongoCredential> credientials = new ArrayList<MongoCredential>();
-	private String db;
+	private Logger mongoLogger = Logger.getLogger("org.mongodb.driver");
 	
-	private MongoClient client;
-	private Morphia morphia;
+	private ServerAddress serverAddress;
+	private List<MongoCredential> credientials = new ArrayList<MongoCredential>();
+	private String DBName;
+	
+	private MongoClient mongoClient;
+	private Morphia morphiaClient;
 	private Datastore datastore;
 	
-	private VitreusPlayerDAO playerDAO;
+	private VitreusDAO DAO;
 	
 	public VitreusDB(String host, int port, String user, String userDb, String password, String db) {
-		credientials.add(MongoCredential.createCredential(user, userDb, password.toCharArray()));
-		this.db = db;
+		MongoCredential vitreusCredential = MongoCredential.createCredential(user, userDb, password.toCharArray());
 		
-		try {
-			address = new ServerAddress(host, port);
-		} catch (Exception exception) {
-			exception.printStackTrace();
-		}
+		DBName = db;
+		serverAddress = new ServerAddress(host, port);
+		credientials.add(vitreusCredential);		
 	}
 	
 	public VitreusDB(FileConfiguration config) {
-		String host = config.getString("db.host");
+		MongoCredential vitreusCredential;
+		
 		int port = config.getInt("db.port");
+		String host = config.getString("db.host");
 		String user = config.getString("db.user.name");
 		String userDb = config.getString("db.user.authDBName");
 		String password = config.getString("db.user.password");
 		String db = config.getString("db.name");
 		
-		credientials.add(MongoCredential.createCredential(user, userDb, password.toCharArray()));
-		this.db = db;
+		vitreusCredential = MongoCredential.createCredential(user, userDb, password.toCharArray());
 		
-		try {
-			address = new ServerAddress(host, port);
-		} catch (Exception exception) {
-			exception.printStackTrace();
-		}
+		serverAddress = new ServerAddress(host, port);
+		DBName = db;
+		credientials.add(vitreusCredential);
 	}
 	
 	public void connect() {
+		MapperOptions mappingOptions;
+
+		mongoClient = new MongoClient(serverAddress, credientials);
+		morphiaClient = new Morphia();	
+
+		mappingOptions = morphiaClient.getMapper().getOptions();
+		mappingOptions.setStoreEmpties(true);
+		mappingOptions.setStoreNulls(true);
+
+		morphiaClient.getMapper().setOptions(mappingOptions);
+		morphiaClient.mapPackage("online.vitreusmc.vitreusConnect.object");
 		
-		try {
-			client = new MongoClient(address, credientials);
-			
-			morphia = new Morphia();	
-			morphia.map(VitreusPlayer.class);
+		datastore = morphiaClient.createDatastore(mongoClient, DBName);
+		datastore.ensureIndexes();
 		
-			datastore = morphia.createDatastore(client, db);
-			datastore.ensureIndexes();
-				
-			playerDAO = new VitreusPlayerDAO(VitreusPlayer.class, datastore);
-		} catch (Exception exception) {
-			exception.printStackTrace();
-		}
+		DAO = new VitreusDAO(datastore);
+		
+		mongoLogger.log(Level.SEVERE, "This is just a test! Don't panic! Don't lose ye' mind!");
+		throw new Error("This is just a test! Don't panic! Don't lose ye' mind!");
 	}
 	
-	
-	// Player Database Tasks
-	public VitreusPlayer getPlayer(Player player) {
-		VitreusPlayer vitreusPlayer = playerDAO.findOne("uuid", player.getUniqueId());
-		
-		if (vitreusPlayer == null) {
-			vitreusPlayer = createPlayer(player);
-		}
-		
-		return vitreusPlayer;
+	public Datastore getDatastore() {
+		return datastore;
 	}
 	
-	public void savePlayer(VitreusPlayer vitreusPlayer) {
-		playerDAO.save(vitreusPlayer);
+	@SuppressWarnings("unchecked")
+	public <T extends VitreusObject> BasicDAO<T, String> getDAO(Class<T> entityClass) {
+		return (BasicDAO<T, String>) DAO.getDAO(entityClass);
 	}
 	
-	public VitreusPlayer createPlayer(Player player) {
-		VitreusPlayer vitreusPlayer = new VitreusPlayer();
-		
-		vitreusPlayer.setUUID(player.getUniqueId().toString());
-		vitreusPlayer.setUsername(player.getName());
-		vitreusPlayer.setMinutesPlayed(player.getStatistic(Statistic.PLAY_ONE_TICK) / 20 / 60);
-		vitreusPlayer.setLastOnline(new Date());
-		vitreusPlayer.setColor(ChatColor.WHITE);
-		
-		playerDAO.save(vitreusPlayer);
-		
-		return vitreusPlayer;
+	public Logger getLogger() {
+		return mongoLogger;
 	}
-	
 }
